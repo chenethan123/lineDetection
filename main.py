@@ -1,3 +1,7 @@
+#Formula https://stackoverflow.com/questions/15780210/python-opencv-detect-parallel-lines#:~:text=Two%20lines%20y%20%3D%20k1%20*%20x,points%20that%20belong%20to%20line.
+#Research on Hough Lines https://www.geeksforgeeks.org/line-detection-python-opencv-houghline-method/
+
+
 import cv2 as cv
 import numpy as np
 
