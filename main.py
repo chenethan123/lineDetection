@@ -1,32 +1,8 @@
-# Importing necessary libraries
+# main.py
+
 import cv2
 import numpy as np
-
-# Function to create a region of interest mask
-def region_of_interest(img, vertices):
-    mask = np.zeros_like(img)
-    cv2.fillPoly(mask, [vertices], 255)
-    masked_img = cv2.bitwise_and(img, mask)
-    return masked_img
-
-# Function to draw lines on the image
-def draw_lines(img, lines, color=(0, 0, 255), thickness=2):
-    if lines is not None:
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                cv2.line(img, (x1, y1), (x2, y2), color, thickness)
-
-# Function to apply Hough Transform and detect lines in the image
-def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
-    lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
-    return lines
-
-# Function to draw a middle line between parallel lines
-def draw_middle_line(img, lines, color=(0, 255, 0), thickness=3):
-    if lines is not None and len(lines) > 0:
-        middle_line = np.mean(lines, axis=0, dtype=np.int32)
-        x1, y1, x2, y2 = middle_line.flatten()
-        cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+from line_detection_functions import region_of_interest, draw_lines, hough_lines, draw_middle_line
 
 # Open the default camera (index 0)
 cap = cv2.VideoCapture(0)
