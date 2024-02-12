@@ -1,69 +1,74 @@
 #Formula https://stackoverflow.com/questions/15780210/python-opencv-detect-parallel-lines#:~:text=Two%20lines%20y%20%3D%20k1%20*%20x,points%20that%20belong%20to%20line.
 #Research on Hough Lines https://www.geeksforgeeks.org/line-detection-python-opencv-houghline-method/
-
-
-import cv2 as cv
+import cv2
 import numpy as np
 
-def detect_lines(frame):
-    height, width = frame.shape[:2]
+def region_of_interest(img, vertices):
+    mask = np.zeros_like(img)
+    cv2.fillPoly(mask, [vertices], 255)
+    masked_img = cv2.bitwise_and(img, mask)
+    return masked_img
 
-    # Define the region of interest (ROI)
-    roi_top = int(height * 0.6)  # Top boundary of ROI (60% of the frame height)
-    roi_bottom = height  # Bottom boundary of ROI (bottom of the frame)
-    roi_left = int(width * 0.2)  # Left boundary of ROI (20% of the frame width)
-    roi_right = int(width * 0.8)  # Right boundary of ROI (80% of the frame width)
-
-    # Draw a rectangle to mark the ROI on the frame
-    cv.rectangle(frame, (roi_left, roi_top), (roi_right, roi_bottom), (0, 255, 0), 2)
-
-    roi = frame[roi_top:roi_bottom, roi_left:roi_right]
-
-    gray = cv.cvtColor(roi, cv.COLOR_BGR2GRAY)  # Convert the ROI to grayscale
-
-    edges = cv.Canny(gray, 50, 150, apertureSize=3)  # Detect edges using Canny edge detection
-    lines = cv.HoughLines(edges, 1, np.pi / 180, 200)  # Detect lines using Hough transform
-
+def draw_lines(img, lines, color=(0, 0, 255), thickness=2):
     if lines is not None:
         for line in lines:
-            rho, theta = line[0]  # Get rho and theta values, which are the parameters of the line
-            a = np.cos(theta)
-            b = np.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            x1 = int(x0 + 1000 * (-b))
-            y1 = int(y0 + 1000 * (a))
-            x2 = int(x0 - 1000 * (-b))
-            y2 = int(y0 - 1000 * (a))
+            for x1, y1, x2, y2 in line:
+                cv2.line(img, (x1, y1), (x2, y2), color, thickness)
 
-            # Adjust line coordinates to match the original frame
-            x1 += roi_left
-            x2 += roi_left
-            y1 += roi_top
-            y2 += roi_top
+def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
+    lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
+    return lines
 
-            cv.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)  # Draw the line on the frame
+def draw_middle_line(img, lines, color=(0, 255, 0), thickness=3):
+    if lines is not None and len(lines) > 0:
+        middle_line = np.mean(lines, axis=0, dtype=np.int32)
+        x1, y1, x2, y2 = middle_line.flatten()
+        cv2.line(img, (x1, y1), (x2, y2), color, thickness)
 
-    return frame
+cap = cv2.VideoCapture(0)  # Use 0 for the default camera, or provide a specific video file path
 
-def main():
-    cap = cv.VideoCapture(0)  # Open the default camera (camera index 0)
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
 
-    while True:
-        ret, frame = cap.read()  # Read a frame from the camera
+    # Define the region of interest as a slightly larger square
+    height, width = frame.shape[:2]
+    roi_size = 70  # Increase the size of the ROI
+    roi_vertices = np.array([[(width // 2 - roi_size, height // 2 - roi_size),
+                              (width // 2 + roi_size, height // 2 - roi_size),
+                              (width // 2 + roi_size, height // 2 + roi_size),
+                              (width // 2 - roi_size, height // 2 + roi_size)]], dtype=np.int32)
+    
+    # Convert the frame to grayscale
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        frame_with_lines = detect_lines(frame)
+    # Apply GaussianBlur to the grayscale image
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # Resize the frame to fit the screen
-        disp_img = cv.resize(frame_with_lines, (700, 800))
+    # Apply Canny edge detection
+    edges = cv2.Canny(blur, 50, 150)
 
-        cv.imshow('Line Detection', disp_img)  # Display the result
+    # Apply region of interest mask
+    roi = region_of_interest(edges, roi_vertices)
 
-        if cv.waitKey(1) & 0xFF == ord('q'):
-            break
+    # Draw the ROI on the frame
+    cv2.polylines(frame, roi_vertices, isClosed=True, color=(255, 0, 0), thickness=2)
 
-    cap.release()  # Release the camera
-    cv.destroyAllWindows()  # Close all OpenCV windows
+    # Apply Hough Transform to detect lines
+    lines = hough_lines(roi, rho=1, theta=np.pi/180, threshold=15, min_line_len=40, max_line_gap=20)
 
-if __name__ == "__main__":
-    main()
+    # Draw parallel lines on the original frame
+    draw_lines(frame, lines)
+
+    # Draw the middle line between parallel lines
+    draw_middle_line(frame, lines)
+
+    # Display the result
+    cv2.imshow('Parallel Lines Detection', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
